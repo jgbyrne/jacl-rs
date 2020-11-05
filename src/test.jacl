@@ -1,0 +1,42 @@
+stations {
+    r4 {
+        name = "Radio 4"
+	freq = ("FM", 93)
+    }
+
+    r6 {
+	name = "Radio 6 Music"
+	freq = ("DAB", "12B")
+    }
+
+    r4 + r6 {
+	broadcaster = "BBC"
+        website = "https://www.bbc.co.uk/sounds/"
+    }
+
+    p6 {
+	broadcaster = "DR"
+	name = "P6 Beat"
+	freq = false
+	website = "https://www.dr.dk/radio/p6beat/"
+    }
+
+    weekdays = r4
+    weekends = p6
+}
+
+alarms [
+    {% 
+        days = "weekends"
+	time = "09:55"
+	alarm = "skylarks"
+	volume = 3.7
+    %}
+
+    {%
+        days = "weekdays"
+	time = "06:55"
+	alarm = "pulsar"
+	volume = 5.9 
+    %} 
+]

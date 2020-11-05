@@ -224,11 +224,6 @@ pub fn tokenise<'src>(input: &'src str) -> Vec<Token<'src>> {
             continue;
         }
 
-        if c == '\r' {
-            continue;
-        }
-
-
         col += 1;
     }
 
