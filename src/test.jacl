@@ -30,7 +30,7 @@ alarms [
         days = "weekends"
 	time = "09:55"
 	alarm = "skylarks"
-	volume = 3.7
+        volume = 3.4 
     %}
 
     {%

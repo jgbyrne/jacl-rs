@@ -1,3 +1,6 @@
+use crate::error::{Error};
+use std::iter;
+
 #[derive(Debug)]
 pub enum Value<'src> {
     Name(&'src str),
@@ -25,6 +28,8 @@ pub enum Value<'src> {
     At,
 
     Break,
+
+    Fault,
 }
 
 #[derive(Debug)]
@@ -32,9 +37,9 @@ pub struct Token<'src> {
     val: Value<'src>,
     lptr: usize,
     rptr: usize,
-    lno: usize,
-    col: usize,
-    len: usize,
+    pub lno: usize,
+    pub col: usize,
+    pub len: usize,
 }
 
 impl<'src> Token<'src> {
@@ -59,6 +64,8 @@ enum State {
     InFloat,
     SeenBrace,
     SeenPct,
+
+    Unrecoverable,
 }
 
 fn unambiguous_symbol<'src>(c: char) -> Option<Value<'src>> { 
@@ -82,7 +89,12 @@ fn unambiguous_symbol<'src>(c: char) -> Option<Value<'src>> {
     }
 }
 
-pub fn tokenise<'src>(input: &'src str) -> Vec<Token<'src>> {
+pub fn tokenise<'src>(input: &'src str) -> (Vec<(usize, usize)>, Result<Vec<Token<'src>>, Vec<Error<'src>>>) {
+    let mut lines: Vec<(usize, usize)> = Vec::new(); // Spans of Lines - byte offsets
+    let mut lineptr: usize = 0;                      // Start of current Line - byte offset
+
+    let mut errors: Vec<Error> = Vec::new();
+
     let mut toks = Vec::new();       // Built Tokens
     let mut lptr: usize = 0;         // Left end of current Token - byte offset
     let mut rptr: usize = 0;         // Right end of current Token - byte offset
@@ -93,7 +105,12 @@ pub fn tokenise<'src>(input: &'src str) -> Vec<Token<'src>> {
     let mut lno: usize = 1;          // Line number of current char
     let mut col: usize = 1;          // Column number of current char
 
-    for (offset, c) in input.char_indices() {
+    let end = iter::once((input.len(), ';'));
+    for (offset, c) in input.char_indices().chain(end) {
+
+        if col == 1 {
+            lineptr = offset; 
+        }
 
         // Check if we need to change state *before* updating `rptr`
         match &state {
@@ -105,9 +122,17 @@ pub fn tokenise<'src>(input: &'src str) -> Vec<Token<'src>> {
                             state = State::InFloat;
                         }
                         else {
-                            let val = str::parse::<i64>(buf).expect("Could not parse number to i64");
-                            toks.push(Token::new(Value::Integer(val), lptr, rptr,
-                                                 lno, lcol, col - lcol));
+                            if let Ok(val) = str::parse::<i64>(buf) {
+                                toks.push(Token::new(Value::Integer(val), lptr, rptr,
+                                                     lno, lcol, col - lcol));
+                            }
+                            else {
+                                let tok = Token::new(Value::Fault, lptr, rptr,
+                                                     lno, lcol, col - lcol);
+                                println!("{}, {}", lcol, col);
+                                errors.push(Error::detailed(100, String::from("Could not parse number as 64-byte signed Integer"),
+                                                            tok, String::from("This value may be too large")));
+                            }
                             state = State::Neutral;
                         }
                     }
@@ -133,9 +158,17 @@ pub fn tokenise<'src>(input: &'src str) -> Vec<Token<'src>> {
             State::InFloat => {
                 if !c.is_ascii_digit() {
                     let buf = &input[lptr..=rptr];
-                    let val = str::parse::<f64>(buf).expect("Could not parse number to f64");
-                    toks.push(Token::new(Value::Float(val), lptr, rptr,
-                                         lno, lcol, col - lcol));
+                    if let Ok(val) = str::parse::<f64>(buf) {
+                        toks.push(Token::new(Value::Float(val), lptr, rptr,
+                                             lno, lcol, col - lcol));
+                    }
+                    else {
+                        let tok = Token::new(Value::Fault, lptr, rptr,
+                                             lno, lcol, col - lcol);
+
+                        errors.push(Error::detailed(101, String::from("Could not parse number as 64-byte Float"),
+                                                    tok, String::from("This value may be too large")));
+                    }
                     state = State::Neutral;
                 }
             },
@@ -148,6 +181,23 @@ pub fn tokenise<'src>(input: &'src str) -> Vec<Token<'src>> {
                 }
             }
             _ => {},
+        }
+
+        if c == '\n' {
+            if let State::SeenPct = state {
+               let tok = Token::new(Value::Fault, lptr, rptr,
+                                     lno, lcol, col - lcol);
+
+                errors.push(Error::detailed(104, String::from("% was followed by a newline"),
+                                            tok, String::from("Expected '}'"))); 
+
+                state = State::Unrecoverable;
+            }
+
+            lines.push((lineptr, rptr));
+            lno += 1;
+            col = 1;
+            continue;
         }
 
         rptr = offset;
@@ -167,7 +217,7 @@ pub fn tokenise<'src>(input: &'src str) -> Vec<Token<'src>> {
 
                 if let Some(symbol) = unambiguous_symbol(c) {
                     toks.push(Token::new(symbol, lptr, rptr,
-                                         lno, lcol, col - lcol));
+                                         lno, lcol, 1));
                 }
                 else if c == '{' {
                     state = State::SeenBrace;
@@ -182,7 +232,13 @@ pub fn tokenise<'src>(input: &'src str) -> Vec<Token<'src>> {
                     state = State::InBare;
                 }
                 else if !c.is_whitespace() {
-                    panic!("Unrecognised symbol {}", c);
+                    let tok = Token::new(Value::Fault, lptr, rptr,
+                                         lno, lcol, 1);
+
+                    errors.push(Error::detailed(102, String::from("Unexpected Character"),
+                                                tok, String::from("This character could not be understood")));
+
+                    state = State::Unrecoverable;
                 }
             },
             State::InString { escaped } => {
@@ -208,24 +264,32 @@ pub fn tokenise<'src>(input: &'src str) -> Vec<Token<'src>> {
                 state = State::Neutral;
             },
             State::SeenPct => {
-                if c != '}' {
-                    panic!("% was not followed by }");
+                if c == '}' {
+                    toks.push(Token::new(Value::RBracePct, lptr, rptr,
+                                         lno, lcol, col - lcol));
+                    state = State::Neutral;
                 }
-                toks.push(Token::new(Value::RBracePct, lptr, rptr,
-                                     lno, lcol, col - lcol));
-                state = State::Neutral;
+                else {
+                    let tok = Token::new(Value::Fault, lptr, rptr,
+                                         lno, lcol, col - lcol);
+
+                    errors.push(Error::detailed(103, String::from("% was not followed by }"),
+                                                tok, String::from("Unparseable character pair here"))); 
+
+                    state = State::Unrecoverable;
+                }
             },
             _ => {},
-        }
-
-        if c == '\n' {
-            lno += 1;
-            col = 1;
-            continue;
         }
 
         col += 1;
     }
 
-    toks
+    if errors.len() > 0 {
+        (lines, Err(errors))
+    }
+    else {
+        (lines, Ok(toks))
+    }
 }
+
