@@ -65,13 +65,13 @@ fn transform_entries<'s, 'jacl: 's>(entries: &'s Entries, jacl: &'jacl Jacl) -> 
 
 pub trait EntryStruct<'s> {
     fn entries(&self) -> Vec<(Option<&String>, Option<JaclStruct<'s>>)>;
-    fn get_entry<S: AsRef<str>>(&self, key: S) -> Option<JaclStruct<'s>>;
+    fn get_entry(&self, key: &str) -> Option<JaclStruct<'s>>;
     fn resolve_key(&self, key: &Value) -> Option<JaclStruct<'s>>;
 }
 
 pub trait PropertyStruct {
     fn properties(&self) -> Vec<(&String, &Value)>;
-    fn get_property<S: AsRef<str>>(&self, val: S) -> Option<&Value>;
+    fn get_property(&self, val: &str) -> Option<&Value>;
 }
 
 #[derive(Debug)]
@@ -86,8 +86,8 @@ impl<'s> EntryStruct<'s> for Object<'s> {
         transform_entries(self.entries, self.jacl)
     }
 
-    fn get_entry<S: AsRef<str>>(&self, key: S) -> Option<JaclStruct<'s>> {
-        match self.entries.get(key.as_ref()) {
+    fn get_entry(&self, key: &str) -> Option<JaclStruct<'s>> {
+        match self.entries.get(key) {
             Some(entry) => transform_entry(entry, self.jacl),
             None => None,
         }
@@ -108,8 +108,8 @@ impl PropertyStruct for Object<'_> {
         self.props.iter().collect::<Vec<(&String, &Value)>>()
     }
 
-    fn get_property<S: AsRef<str>>(&self, val: S) -> Option<&Value> {
-        self.props.get(val.as_ref())
+    fn get_property(&self, val: &str) -> Option<&Value> {
+        self.props.get(val)
     }
 }
 
@@ -134,8 +134,8 @@ impl<'s> EntryStruct<'s> for Table<'s> {
         transform_entries(self.entries, self.jacl)
     }
 
-    fn get_entry<S: AsRef<str>>(&self, key: S) -> Option<JaclStruct<'s>> {
-        match self.entries.get(key.as_ref()) {
+    fn get_entry(&self, key: &str) -> Option<JaclStruct<'s>> {
+        match self.entries.get(key) {
             Some(entry) => transform_entry(entry, self.jacl),
             None => None,
         }
@@ -162,8 +162,8 @@ impl PropertyStruct for Map<'_> {
         self.props.iter().collect::<Vec<(&String, &Value)>>()
     }
 
-    fn get_property<S: AsRef<str>>(&self, val: S) -> Option<&Value> {
-        self.props.get(val.as_ref())
+    fn get_property(&self, val: &str) -> Option<&Value> {
+        self.props.get(val)
     }
 }
 
@@ -172,6 +172,24 @@ pub enum JaclStruct<'s> {
     Object(Object<'s>),
     Table(Table<'s>),
     Map(Map<'s>),
+}
+
+impl<'s> JaclStruct<'s> {
+    pub fn as_entry_struct(&self) -> Option<&dyn EntryStruct> {
+        match self {
+            JaclStruct::Map(_) => None,
+            JaclStruct::Object(strct) => Some(strct as &dyn EntryStruct),
+            JaclStruct::Table(strct) => Some(strct as &dyn EntryStruct),
+        }
+    }
+
+    pub fn as_property_struct(&self) -> Option<&dyn PropertyStruct> {
+        match self {
+            JaclStruct::Map(strct) => Some(strct as &dyn PropertyStruct),
+            JaclStruct::Object(strct) => Some(strct as &dyn PropertyStruct),
+            JaclStruct::Table(_) => None,
+        }
+    }
 }
 
 #[derive(Debug)]
