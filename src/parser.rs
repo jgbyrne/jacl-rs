@@ -147,7 +147,7 @@ impl<'ln, 'src> Parser<'ln, 'src> {
                 else {
                     println!("expected {:?}", tok);
                     Err(Error::detailed(150, format!("Expected {}", exp),
-                                        tok.clone(), format!("Found {:?}", tok)))
+                                        tok.clone(), format!("Found {:?}", tok.val)))
                 }
             },
             None => {
