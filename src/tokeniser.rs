@@ -194,8 +194,20 @@ pub fn tokenise<'src>(input: &'src str) -> (Lines, Result<Vec<Token<'src>>, Vec<
 
                 state = State::Unrecoverable;
             }
-            toks.push(Token::new(TokVal::Break, rptr, offset,
-                                 lno, col, 1));
+            else if !matches!(state, State::Neutral) {
+                let tok = Token::new(TokVal::Fault, lptr, rptr,
+                                     lno, lcol, col - lcol);
+
+                errors.push(Error::detailed(105, String::from("Unexpected newline"),
+                                            tok, String::from("Remove this linebreak")));
+
+                state = State::Unrecoverable;
+
+            }
+            else {
+                toks.push(Token::new(TokVal::Break, rptr, offset,
+                                     lno, col, 1));
+            }
             lines.push((lineptr, rptr));
             lno += 1;
             col = 1;

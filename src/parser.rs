@@ -578,7 +578,7 @@ fn parse_struct<'ln, 'src>(parser: &mut Parser<'ln, 'src>) -> Result<Struct, Err
         },
         _ => {
             Err(Error::detailed(153, String::from("Expected Struct"),
-                                tok.clone(), format!("Found {:?}", tok)))
+                                tok.clone(), format!("Found {:?}", tok.val)))
         },
     }
 }
