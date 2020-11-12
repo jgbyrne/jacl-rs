@@ -2,46 +2,49 @@ mod util;
 mod tokeniser;
 mod parser;
 mod error;
+mod types;
 
-pub use error::{Error, Result};
+pub use error::{Error};
 
 type Lines = Vec<(usize, usize)>;
 
-pub fn read_string<'src>(input: &'src str) -> () {
-    match tokeniser::tokenise(&input) {
-        (lines, Ok(toks)) => {
-            println!("{:#?}", toks);
-        },
-        (lines, Err(errors)) => {
-            for err in errors {
-                err.output(input, &lines);
-            }
+pub struct Jacl {
+    root: types::Struct,
+}
+
+impl Jacl {
+
+}
+
+pub struct JaclError<'src> {
+    internal: Error<'src>,
+    input: &'src str,
+    lines: Lines,
+}
+
+impl<'src> JaclError<'src> {
+    fn from_error(err: Error<'src>, input: &'src str, lines: Lines) -> JaclError<'src> {
+        JaclError {
+            internal: err,
+            input,
+            lines,
         }
     }
 }
 
-#[cfg(test)]
-mod tests {
-    use crate::tokeniser;
-    use crate::parser;
-    use std::fs; 
-
-    #[test]
-    fn test_tokenise() {
-        let input = fs::read_to_string("./src/test.jacl").unwrap();
-        match tokeniser::tokenise(&input) {
-            (lines, Ok(toks)) => {
-                println!("{:#?}", toks);
-                match parser::parse(&input, &lines, toks) {
-                    Ok(data) => println!("{:#?}", data),
-                    Err(e) => e.output(&input, &lines),
-                }
-            },
-            (lines, Err(errors)) => {
-                for err in errors {
-                    err.output(&input, &lines);
-                }
+pub fn read_string<'src>(input: &'src str) -> Result<Jacl, JaclError> {
+    match tokeniser::tokenise(&input) {
+        (lines, Ok(toks)) => {
+            match parser::parse(&input, &lines, toks) {
+                Ok(data) => Ok(Jacl { root: data }),
+                Err(err) => Err(JaclError::from_error(err, &input, lines)),
             }
+        },
+        (lines, Err(errors)) => {
+            Err(JaclError::from_error(
+                    errors.get(0).expect("Tokeniser returned empty error list").clone(),
+                    &input,
+                    lines))
         }
     }
 }

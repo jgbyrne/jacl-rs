@@ -3,31 +3,10 @@ use indexmap::map::IndexMap;
 use crate::Lines;
 use crate::tokeniser::{Token, TokVal};
 use crate::error::Error;
-
-// If `Value` and `Struct` are good enough to be the final repr, maybe factor out?
-
-#[derive(Clone, Debug)]
-pub enum Value {
-    Key(String),
-    ForeignKey(String),
-    Property(String),
-    Tuple(Vec<Value>),
-
-    Str(String),
-    Int(i64),
-    Float(f64),
-    Bool(bool),
-}
-
-#[derive(Clone, Debug)]
-pub enum Struct {
-    Object { entries: Entries, props: Props},
-    Table { entries: Entries },
-    Map { props: Props },
-}
+use crate::types::{Struct, Value, Entries, Props};
 
 impl Struct {
-    fn entries_extend<'src>(parser: &mut Parser<'src>,
+    fn entries_extend<'ln, 'src>(parser: &mut Parser<'ln, 'src>,
                             ex_entries: &mut Entries,
                             new_entries: &Entries) -> Result<(), Error<'src>> {
         for (new_key, new_entry) in new_entries.iter() {
@@ -47,8 +26,8 @@ impl Struct {
         Ok(())
     }
 
-    fn extend<'src>(&mut self,
-                    parser: &mut Parser<'src>,
+    fn extend<'ln, 'src>(&mut self,
+                    parser: &mut Parser<'ln, 'src>,
                     name: &str, new: Struct) -> Result<(), Error<'src>>{
         match self {
             Struct::Object { entries: ex_entries,
@@ -85,19 +64,16 @@ enum RValue {
     Struct(Struct),
 }
 
-type Entries = IndexMap<String, Option<Struct>>;
-type Props = IndexMap<String, Value>;
-
-struct Parser<'src> {
+struct Parser<'ln, 'src: 'ln> {
     input: &'src str,
-    lines: &'src Lines,
+    lines: &'ln Lines,
     tokens: Vec<Token<'src>>,
 
     ptr: usize,
 }
 
-impl<'src> Parser<'src> {
-    fn new(input: &'src str, lines: &'src Lines, tokens: Vec<Token<'src>>) -> Parser<'src> {
+impl<'ln, 'src> Parser<'ln, 'src> {
+    fn new(input: &'src str, lines: &'ln Lines, tokens: Vec<Token<'src>>) -> Parser<'ln, 'src> {
         Parser {
            input,
            lines,
@@ -201,7 +177,7 @@ impl<'src> Parser<'src> {
 
 /* Parse Bindings */
 
-fn parse_val<'src>(parser: &mut Parser<'src>) -> Result<Value, Error<'src>> {
+fn parse_val<'ln, 'src>(parser: &mut Parser<'ln, 'src>) -> Result<Value, Error<'src>> {
     match parser.cur_expect()?.val {
         TokVal::Name(name) => {
             parser.step();
@@ -280,7 +256,7 @@ fn parse_val<'src>(parser: &mut Parser<'src>) -> Result<Value, Error<'src>> {
     }
 }
 
-fn parse_rval<'src>(parser: &mut Parser<'src>) -> Result<RValue, Error<'src>> {
+fn parse_rval<'ln, 'src>(parser: &mut Parser<'ln, 'src>) -> Result<RValue, Error<'src>> {
     match parser.cur_expect()?.val {
         TokVal::LBrace | TokVal::LBrack | TokVal::LBracePct => {
             Ok(RValue::Struct(parse_struct(parser)?))
@@ -291,7 +267,7 @@ fn parse_rval<'src>(parser: &mut Parser<'src>) -> Result<RValue, Error<'src>> {
     }
 }
 
-fn parse_rhs<'src>(parser: &mut Parser<'src>, strct: &mut Struct, names: Vec<String>) -> Result<(), Error<'src>> {
+fn parse_rhs<'ln, 'src>(parser: &mut Parser<'ln, 'src>, strct: &mut Struct, names: Vec<String>) -> Result<(), Error<'src>> {
     let eq = parser.expect(|tv| matches!(tv, TokVal::Equals), "'='")?;
     let rval_start = parser.cur_expect()?;
     match parse_rval(parser)? {
@@ -333,7 +309,7 @@ fn parse_rhs<'src>(parser: &mut Parser<'src>, strct: &mut Struct, names: Vec<Str
     }
 }
 
-fn parse_single_binding<'src>(parser: &mut Parser<'src>, strct: &mut Struct) -> Result<(), Error<'src>> {
+fn parse_single_binding<'ln, 'src>(parser: &mut Parser<'ln, 'src>, strct: &mut Struct) -> Result<(), Error<'src>> {
     if let TokVal::Name(name) = parser.cur_expect()?.val {
         parser.step();
         parse_rhs(parser, strct, vec![name.to_string()])
@@ -343,7 +319,7 @@ fn parse_single_binding<'src>(parser: &mut Parser<'src>, strct: &mut Struct) -> 
     }
 }
 
-fn parse_multiple_binding<'src>(parser: &mut Parser<'src>, strct: &mut Struct) -> Result<(), Error<'src>> {
+fn parse_multiple_binding<'ln, 'src>(parser: &mut Parser<'ln, 'src>, strct: &mut Struct) -> Result<(), Error<'src>> {
     let mut names = Vec::new();
     loop {
         if let TokVal::Name(name) = parser.expect(|tv| matches!(tv, TokVal::Name{..}), "name")?.val {
@@ -372,7 +348,7 @@ fn parse_multiple_binding<'src>(parser: &mut Parser<'src>, strct: &mut Struct) -
 
 /* Parse Entries */
 
-fn parse_single_entry<'src>(parser: &mut Parser<'src>, strct: &mut Struct) -> Result<(), Error<'src>> {
+fn parse_single_entry<'ln, 'src>(parser: &mut Parser<'ln, 'src>, strct: &mut Struct) -> Result<(), Error<'src>> {
     match strct {
         Struct::Object { entries, props: _ } |
         Struct::Table { entries } => {
@@ -406,7 +382,7 @@ fn parse_single_entry<'src>(parser: &mut Parser<'src>, strct: &mut Struct) -> Re
     }
 }
 
-fn parse_compound_entry<'src>(parser: &mut Parser<'src>, strct: &mut Struct) -> Result<(), Error<'src>> {
+fn parse_compound_entry<'ln, 'src>(parser: &mut Parser<'ln, 'src>, strct: &mut Struct) -> Result<(), Error<'src>> {
     match strct {
         Struct::Object { entries, props: _ } |
         Struct::Table { entries } => {
@@ -450,15 +426,15 @@ fn parse_compound_entry<'src>(parser: &mut Parser<'src>, strct: &mut Struct) -> 
     }
 }
 
-fn parse_wild_entry<'src>(parser: &mut Parser<'src>, strct: &mut Struct) -> Result<(), Error<'src>> {
+fn parse_wild_entry<'ln, 'src>(parser: &mut Parser<'ln, 'src>, strct: &mut Struct) -> Result<(), Error<'src>> {
     Err(Error::basic(1, String::from("Internal Error: Unimplemented")))
 }
 
-fn parse_prop_entry<'src>(parser: &mut Parser<'src>, strct: &mut Struct) -> Result<(), Error<'src>> {
+fn parse_prop_entry<'ln, 'src>(parser: &mut Parser<'ln, 'src>, strct: &mut Struct) -> Result<(), Error<'src>> {
     Err(Error::basic(1, String::from("Internal Error: Unimplemented")))
 }
 
-fn parse_empty_entry<'src>(parser: &mut Parser<'src>, strct: &mut Struct) -> Result<(), Error<'src>> {
+fn parse_empty_entry<'ln, 'src>(parser: &mut Parser<'ln, 'src>, strct: &mut Struct) -> Result<(), Error<'src>> {
     match strct {
         Struct::Object { entries, props: _ } |
         Struct::Table { entries } => {
@@ -487,7 +463,7 @@ fn parse_empty_entry<'src>(parser: &mut Parser<'src>, strct: &mut Struct) -> Res
     }
 }
 
-fn parse_anon_entry<'src>(parser: &mut Parser<'src>, strct: &mut Struct) -> Result<(), Error<'src>> {
+fn parse_anon_entry<'ln, 'src>(parser: &mut Parser<'ln, 'src>, strct: &mut Struct) -> Result<(), Error<'src>> {
     match strct {
         Struct::Object { entries, props: _ } |
         Struct::Table { entries } => {
@@ -504,7 +480,7 @@ fn parse_anon_entry<'src>(parser: &mut Parser<'src>, strct: &mut Struct) -> Resu
 
 /* Parse Structures */
 
-fn parse_inner<'src>(parser: &mut Parser<'src>, strct: &mut Struct) -> Result<(), Error<'src>> {
+fn parse_inner<'ln, 'src>(parser: &mut Parser<'ln, 'src>, strct: &mut Struct) -> Result<(), Error<'src>> {
     loop {
         parser.allow_break();
         let cur_tok = parser.cur();
@@ -552,7 +528,7 @@ fn parse_inner<'src>(parser: &mut Parser<'src>, strct: &mut Struct) -> Result<()
 }
 
 
-fn parse_obj_struct<'src>(parser: &mut Parser<'src>) -> Result<Struct, Error<'src>> {
+fn parse_obj_struct<'ln, 'src>(parser: &mut Parser<'ln, 'src>) -> Result<Struct, Error<'src>> {
     parser.expect(|tv| matches!(tv, TokVal::LBrace), "'{'");
     let mut obj = Struct::Object {
         entries: IndexMap::new(),
@@ -563,7 +539,7 @@ fn parse_obj_struct<'src>(parser: &mut Parser<'src>) -> Result<Struct, Error<'sr
     Ok(obj)
 }
 
-fn parse_tbl_struct<'src>(parser: &mut Parser<'src>) -> Result<Struct, Error<'src>> {
+fn parse_tbl_struct<'ln, 'src>(parser: &mut Parser<'ln, 'src>) -> Result<Struct, Error<'src>> {
     parser.expect(|tv| matches!(tv, TokVal::LBrack), "'['");
     let mut tbl = Struct::Table {
         entries: IndexMap::new(),
@@ -573,7 +549,7 @@ fn parse_tbl_struct<'src>(parser: &mut Parser<'src>) -> Result<Struct, Error<'sr
     Ok(tbl)
 }
 
-fn parse_map_struct<'src>(parser: &mut Parser<'src>) -> Result<Struct, Error<'src>> {
+fn parse_map_struct<'ln, 'src>(parser: &mut Parser<'ln, 'src>) -> Result<Struct, Error<'src>> {
     parser.expect(|tv| matches!(tv, TokVal::LBracePct), "'{%'");
     let mut map = Struct::Map {
         props: IndexMap::new(),
@@ -583,7 +559,7 @@ fn parse_map_struct<'src>(parser: &mut Parser<'src>) -> Result<Struct, Error<'sr
     Ok(map)
 }
 
-fn parse_struct<'src>(parser: &mut Parser<'src>) -> Result<Struct, Error<'src>> {
+fn parse_struct<'ln, 'src>(parser: &mut Parser<'ln, 'src>) -> Result<Struct, Error<'src>> {
     let tok = parser.cur_expect()?;
     match tok.val {
         TokVal::LBrace => {
@@ -602,8 +578,8 @@ fn parse_struct<'src>(parser: &mut Parser<'src>) -> Result<Struct, Error<'src>> 
     }
 }
 
-pub fn parse<'src>(input: &'src str,
-                   lines: &'src Lines,
+pub fn parse<'ln, 'src>(input: &'src str,
+                   lines: &'ln Lines,
                    tokens: Vec<Token<'src>>) -> Result<Struct, Error<'src>> {
     let mut parser = Parser::new(input, lines, tokens);
     let mut root = Struct::Object {

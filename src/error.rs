@@ -3,7 +3,7 @@ use crate::Lines;
 use crate::tokeniser::Token;
 use crate::util::token_line;
 
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 pub struct Error<'src> {
     code: u8,
     msg: String,
