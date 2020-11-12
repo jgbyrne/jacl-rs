@@ -90,6 +90,14 @@ impl<'s> Object<'s> {
         self.props.get(val.as_ref())
     }
 
+    pub fn resolve_property<S: AsRef<str>>(&self, val: S) -> Option<JaclStruct<'s>> {
+        match self.props.get(val.as_ref()) {
+            Some(key@Value::Key(..)) => self.resolve_key(key),
+            Some(..) => None,
+            None => None,
+        }
+    }
+
     pub fn resolve_key(&self, key: &Value) -> Option<JaclStruct<'s>> {
         if let Value::Key(key) = key {
             self.get_entry(&key)
