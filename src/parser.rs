@@ -187,7 +187,7 @@ fn parse_val<'ln, 'src>(parser: &mut Parser<'ln, 'src>) -> Result<Value, Error<'
             parser.step();
             if let TokVal::Name(name) = parser.expect(
                 |tv| matches!(tv, TokVal::Name(_)), "name")?.val {
-                Ok(Value::Property(name.to_string()))
+                Ok(Value::Var(name.to_string()))
             }
             else { Err(
                 Error::basic(1, String::from("Internal Error: Reached the unreachable!"))
@@ -197,7 +197,7 @@ fn parse_val<'ln, 'src>(parser: &mut Parser<'ln, 'src>) -> Result<Value, Error<'
             parser.step();
             if let TokVal::Name(name) = parser.expect(
                 |tv| matches!(tv, TokVal::Name(_)), "name")?.val {
-                Ok(Value::ForeignKey(name.to_string()))
+                Ok(Value::Foreign(name.to_string()))
             }
             else { Err(
                 Error::basic(1, String::from("Internal Error: Reached the unreachable!"))

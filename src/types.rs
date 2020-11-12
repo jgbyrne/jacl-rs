@@ -3,8 +3,8 @@ use indexmap::map::IndexMap;
 #[derive(Clone, Debug)]
 pub enum Value {
     Key(String),
-    ForeignKey(String),
-    Property(String),
+    Var(String),
+    Foreign(String),
     Tuple(Vec<Value>),
 
     Str(String),
