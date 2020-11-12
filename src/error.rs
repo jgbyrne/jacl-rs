@@ -31,15 +31,15 @@ impl<'src> Error<'src> {
         }
     }
 
-    pub fn output(&self, input: &'src str, lines: &Lines) {
+    pub fn render(&self, input: &'src str, lines: &Lines) -> String {
         if let (Some(ref token), Some(ref hint)) = (&self.token, &self.hint) {
             let code_line = format!("{:<3}| {}", token.lno, token_line(input, lines, token));
             let ptr_line = format!("{}{}", " ".repeat(4 + token.col), "^".repeat(token.len));
             let hint_line = format!("Hint: {}", hint);
-            eprintln!("[E{}] {}\n{}\n{}\n{}", self.code, self.msg, code_line, ptr_line, hint_line);
+            format!("[E{}] {}\n{}\n{}\n{}\n", self.code, self.msg, code_line, ptr_line, hint_line)
         }
         else {
-            eprintln!("[E{}] {}", self.code, self.msg);
+            format!("[E{}] {}\n", self.code, self.msg)
         }
     }
 }

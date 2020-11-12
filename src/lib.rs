@@ -34,6 +34,10 @@ impl<'src> JaclError<'src> {
             lines,
         }
     }
+
+    pub fn render(&self) -> String {
+        self.internal.render(self.input, &self.lines)
+    }
 }
 
 pub fn read_string<'src>(input: &'src str) -> Result<Jacl, JaclError> {
