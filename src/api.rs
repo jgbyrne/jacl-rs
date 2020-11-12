@@ -63,6 +63,17 @@ fn transform_entries<'s, 'jacl: 's>(entries: &'s Entries, jacl: &'jacl Jacl) -> 
         }).collect::<Vec<(Option<&String>, Option<JaclStruct>)>>()
 }
 
+pub trait EntryStruct<'s> {
+    fn entries(&self) -> Vec<(Option<&String>, Option<JaclStruct<'s>>)>;
+    fn get_entry<S: AsRef<str>>(&self, key: S) -> Option<JaclStruct<'s>>;
+    fn resolve_key(&self, key: &Value) -> Option<JaclStruct<'s>>;
+}
+
+pub trait PropertyStruct {
+    fn properties(&self) -> Vec<(&String, &Value)>;
+    fn get_property<S: AsRef<str>>(&self, val: S) -> Option<&Value>;
+}
+
 #[derive(Debug)]
 pub struct Object<'s> {
     jacl: &'s Jacl,
@@ -70,40 +81,44 @@ pub struct Object<'s> {
     props: &'s Props,
 }
 
-impl<'s> Object<'s> {
-    pub fn entries(&self) -> Vec<(Option<&String>, Option<JaclStruct<'s>>)> {
+impl<'s> EntryStruct<'s> for Object<'s> {
+    fn entries(&self) -> Vec<(Option<&String>, Option<JaclStruct<'s>>)> {
         transform_entries(self.entries, self.jacl)
     }
 
-    pub fn properties(&self) -> Vec<(&String, &Value)> {
-        self.props.iter().collect::<Vec<(&String, &Value)>>()
-    }
-    
-    pub fn get_entry<S: AsRef<str>>(&self, key: S) -> Option<JaclStruct<'s>> {
+    fn get_entry<S: AsRef<str>>(&self, key: S) -> Option<JaclStruct<'s>> {
         match self.entries.get(key.as_ref()) {
             Some(entry) => transform_entry(entry, self.jacl),
             None => None,
         }
     }
 
-    pub fn get_property<S: AsRef<str>>(&self, val: S) -> Option<&Value> {
-        self.props.get(val.as_ref())
-    }
-
-    pub fn resolve_property<S: AsRef<str>>(&self, val: S) -> Option<JaclStruct<'s>> {
-        match self.props.get(val.as_ref()) {
-            Some(key@Value::Key(..)) => self.resolve_key(key),
-            Some(..) => None,
-            None => None,
-        }
-    }
-
-    pub fn resolve_key(&self, key: &Value) -> Option<JaclStruct<'s>> {
+    fn resolve_key(&self, key: &Value) -> Option<JaclStruct<'s>> {
         if let Value::Key(key) = key {
             self.get_entry(&key)
         }
         else {
             None
+        }
+    }
+}
+
+impl PropertyStruct for Object<'_> {
+    fn properties(&self) -> Vec<(&String, &Value)> {
+        self.props.iter().collect::<Vec<(&String, &Value)>>()
+    }
+
+    fn get_property<S: AsRef<str>>(&self, val: S) -> Option<&Value> {
+        self.props.get(val.as_ref())
+    }
+}
+
+impl<'s> Object<'s> {
+    pub fn resolve_property<S: AsRef<str>>(&self, val: S) -> Option<JaclStruct<'s>> {
+        match self.props.get(val.as_ref()) {
+            Some(key@Value::Key(..)) => self.resolve_key(key),
+            Some(..) => None,
+            None => None,
         }
     }
 }
@@ -114,19 +129,19 @@ pub struct Table<'s> {
     entries: &'s Entries,
 }
 
-impl<'s> Table<'s> {
-    pub fn entries(&self) -> Vec<(Option<&String>, Option<JaclStruct<'s>>)> {
+impl<'s> EntryStruct<'s> for Table<'s> {
+    fn entries(&self) -> Vec<(Option<&String>, Option<JaclStruct<'s>>)> {
         transform_entries(self.entries, self.jacl)
     }
 
-    pub fn get_entry<S: AsRef<str>>(&self, key: S) -> Option<JaclStruct<'s>> {
+    fn get_entry<S: AsRef<str>>(&self, key: S) -> Option<JaclStruct<'s>> {
         match self.entries.get(key.as_ref()) {
             Some(entry) => transform_entry(entry, self.jacl),
             None => None,
         }
     }
 
-    pub fn resolve_key(&self, key: &Value) -> Option<JaclStruct<'s>> {
+    fn resolve_key(&self, key: &Value) -> Option<JaclStruct<'s>> {
         if let Value::Key(key) = key {
             self.get_entry(&key)
         }
@@ -142,12 +157,12 @@ pub struct Map<'s> {
     props: &'s Props,
 }
 
-impl<'s> Map<'s> {
-    pub fn properties(&self) -> Vec<(&String, &Value)> {
+impl PropertyStruct for Map<'_> {
+    fn properties(&self) -> Vec<(&String, &Value)> {
         self.props.iter().collect::<Vec<(&String, &Value)>>()
     }
 
-    pub fn get_property<S: AsRef<str>>(&self, val: S) -> Option<&Value> {
+    fn get_property<S: AsRef<str>>(&self, val: S) -> Option<&Value> {
         self.props.get(val.as_ref())
     }
 }
