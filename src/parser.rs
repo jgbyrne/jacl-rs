@@ -243,6 +243,32 @@ fn parse_val<'src>(parser: &mut Parser<'src>) -> Result<Value, Error<'src>> {
             parser.step();
             Ok(Value::Bool(boolean))
         }
+        TokVal::LParen => {
+            parser.step();
+            let mut tuple: Vec<Value> = Vec::new();
+            loop {
+                tuple.push(parse_val(parser)?);
+                let tok = parser.cur_expect()?;
+                match tok.val {
+                    TokVal::RParen => {
+                        parser.step();
+                        break;
+                    },
+                    TokVal::Comma => {
+                        parser.step();
+                    },
+                    _ => {
+                        return Err(
+                            Error::detailed(164,
+                                String::from("Invalid syntax inside tuple"),
+                                tok.clone(),
+                                String::from("Expected ',' or ')'"))
+                        );
+                    }
+                }
+            }
+            Ok(Value::Tuple(tuple))
+        },
         _ => {
             Err(
                 Error::detailed(158,
@@ -318,7 +344,30 @@ fn parse_single_binding<'src>(parser: &mut Parser<'src>, strct: &mut Struct) -> 
 }
 
 fn parse_multiple_binding<'src>(parser: &mut Parser<'src>, strct: &mut Struct) -> Result<(), Error<'src>> {
-    Ok(())
+    let mut names = Vec::new();
+    loop {
+        if let TokVal::Name(name) = parser.expect(|tv| matches!(tv, TokVal::Name{..}), "name")?.val {
+            names.push(name.to_string());
+            let tok = parser.cur_expect()?;
+            match tok.val {
+                TokVal::Equals => {
+                    break;
+                },
+                TokVal::Comma => {
+                    parser.step();
+                    continue;
+                },
+                _ => {
+                    return Err(Error::detailed(163, String::from("Expected '=' or ','"),
+                            tok.clone(), String::from("Could not parse this token")));
+                }
+            }
+        }
+        else { 
+            return Err(Error::basic(1, String::from("Internal Error: Reached the unreachable!")));
+        }
+    }
+    parse_rhs(parser, strct, names)
 }
 
 /* Parse Entries */
@@ -358,15 +407,55 @@ fn parse_single_entry<'src>(parser: &mut Parser<'src>, strct: &mut Struct) -> Re
 }
 
 fn parse_compound_entry<'src>(parser: &mut Parser<'src>, strct: &mut Struct) -> Result<(), Error<'src>> {
-    Ok(())
+    match strct {
+        Struct::Object { entries, props: _ } |
+        Struct::Table { entries } => {
+            let mut names = Vec::new();
+            loop {
+                if let TokVal::Name(name) = parser.expect(
+                        |tv| matches!(tv, TokVal::Name(..)), "name")?.val {
+                    names.push(name); 
+                }
+                else {
+                    return Err(
+                        Error::basic(1, String::from("Internal Error: Reached the unreachable!"))
+                    );
+                }
+                if !matches!(parser.cur_expect()?.val, TokVal::Plus) { break; }
+                parser.step();
+            }
+
+            let strct = parse_struct(parser)?;
+            for name in names {
+                if let Some(extant) = entries.get_mut(name) {
+                    match extant {
+                        Some(extant) => {
+                            extant.extend(parser, name, strct.clone());
+                        },
+                        None => {
+                            entries.insert(name.to_string(), Some(strct.clone()));
+                        }
+                    }
+                }
+                else {
+                    entries.insert(name.to_string(), Some(strct.clone()));
+                }
+            }
+            Ok(())
+        },
+        Struct::Map { props: _ } => {
+            Err(Error::detailed(156, String::from("Maps cannot contain Entries"),
+                                parser.cur_expect()?.clone(), String::from("Remove this entry")))
+        }
+    }
 }
 
 fn parse_wild_entry<'src>(parser: &mut Parser<'src>, strct: &mut Struct) -> Result<(), Error<'src>> {
-    Ok(())
+    Err(Error::basic(1, String::from("Internal Error: Unimplemented")))
 }
 
 fn parse_prop_entry<'src>(parser: &mut Parser<'src>, strct: &mut Struct) -> Result<(), Error<'src>> {
-    Ok(())
+    Err(Error::basic(1, String::from("Internal Error: Unimplemented")))
 }
 
 fn parse_empty_entry<'src>(parser: &mut Parser<'src>, strct: &mut Struct) -> Result<(), Error<'src>> {

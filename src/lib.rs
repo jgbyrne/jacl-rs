@@ -28,7 +28,7 @@ mod tests {
 
     #[test]
     fn test_tokenise() {
-        let input = fs::read_to_string("./src/minimal.jacl").unwrap();
+        let input = fs::read_to_string("./src/test.jacl").unwrap();
         match tokeniser::tokenise(&input) {
             (lines, Ok(toks)) => {
                 println!("{:#?}", toks);
