@@ -62,7 +62,7 @@ The literal datatypes in `JACL` are as follows:
 * `Float` - Float values like `0.1337`
 * `Boolean` - Boolean values - either `true` or `false`
 
-There is one compound datatype:
+There is just one compound datatype:
 
 * `Tuple` - Sequences of other values like `(4, true, "lapwing")`
 
@@ -117,7 +117,7 @@ The first, `atom`, is an empty `Entry` - a `Key` with no structure associated.
 
 The second is an anonymous structure. It is a Table which in turn contains three empty entries.
 
-The third entry is a Map. It is also an anonymous structure. However, this structure has a property binding.
+The third entry is a Map. It is also an anonymous structure. However, this structure is bound to a property.
 
 This notation can be considered shorthand for the following:
 
@@ -133,11 +133,11 @@ country = anon
 
 Be careful, though! The structure is still an anonymous entry within the parent Object even though it has a property binding.
 
-Since Keys and Bindings are in different namespaces it is entirely possible to use the same name for a different Entry and Property. This is, however, discouraged for obvious reasons.
+Since Keys and Vars are in different namespaces it is entirely possible to use the same name for a different Entry and Property. This is, however, discouraged for obvious reasons.
 
 ### Duplicate and Triplicate
 
-A property can be assigned to an arbritrary number of bindings.
+A property can be assigned to an arbritrary number of vars.
 
 ```
 numbers {
@@ -186,7 +186,7 @@ drivers {
 }
 ```
 
-This works as you would expect. Bindings can be overwritten by successive definitions.
+This works as you would expect. Vars can be overwritten by successive definitions.
 
 When data-structures are redefined they append to previous definitions.
 
