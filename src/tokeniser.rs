@@ -1,8 +1,9 @@
+use crate::Lines;
 use crate::error::{Error};
 use std::iter;
 
-#[derive(Debug)]
-pub enum Value<'src> {
+#[derive(Clone, Debug)]
+pub enum TokVal<'src> {
     Name(&'src str),
     
     String(&'src str),
@@ -32,9 +33,9 @@ pub enum Value<'src> {
     Fault,
 }
 
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 pub struct Token<'src> {
-    val: Value<'src>,
+    pub val: TokVal<'src>,
     lptr: usize,
     rptr: usize,
     pub lno: usize,
@@ -43,7 +44,7 @@ pub struct Token<'src> {
 }
 
 impl<'src> Token<'src> {
-    fn new(val: Value<'src>, lptr: usize, rptr: usize,
+    fn new(val: TokVal<'src>, lptr: usize, rptr: usize,
            lno: usize, col: usize, len: usize) -> Token<'src> {
         Token {
             val,
@@ -68,29 +69,29 @@ enum State {
     Unrecoverable,
 }
 
-fn unambiguous_symbol<'src>(c: char) -> Option<Value<'src>> { 
+fn unambiguous_symbol<'src>(c: char) -> Option<TokVal<'src>> { 
     match c {
-        '}' => Some(Value::RBrace),
-        '[' => Some(Value::LBrack),
-        ']' => Some(Value::RBrack),
-        '(' => Some(Value::LParen),
-        ')' => Some(Value::RParen),
+        '}' => Some(TokVal::RBrace),
+        '[' => Some(TokVal::LBrack),
+        ']' => Some(TokVal::RBrack),
+        '(' => Some(TokVal::LParen),
+        ')' => Some(TokVal::RParen),
 
-        '=' => Some(Value::Equals),
-        ',' => Some(Value::Comma),
-        '+' => Some(Value::Plus),
-        '-' => Some(Value::Minus),
-        '*' => Some(Value::Star),
-        '$' => Some(Value::Dollar),
-        '@' => Some(Value::At),
+        '=' => Some(TokVal::Equals),
+        ',' => Some(TokVal::Comma),
+        '+' => Some(TokVal::Plus),
+        '-' => Some(TokVal::Minus),
+        '*' => Some(TokVal::Star),
+        '$' => Some(TokVal::Dollar),
+        '@' => Some(TokVal::At),
 
-        ';' => Some(Value::Break),
+        ';' => Some(TokVal::Break),
         _   => None,
     }
 }
 
-pub fn tokenise<'src>(input: &'src str) -> (Vec<(usize, usize)>, Result<Vec<Token<'src>>, Vec<Error<'src>>>) {
-    let mut lines: Vec<(usize, usize)> = Vec::new(); // Spans of Lines - byte offsets
+pub fn tokenise<'src>(input: &'src str) -> (Lines, Result<Vec<Token<'src>>, Vec<Error<'src>>>) {
+    let mut lines: Lines = Vec::new(); // Spans of Lines - byte offsets
     let mut lineptr: usize = 0;                      // Start of current Line - byte offset
 
     let mut errors: Vec<Error> = Vec::new();
@@ -123,11 +124,11 @@ pub fn tokenise<'src>(input: &'src str) -> (Vec<(usize, usize)>, Result<Vec<Toke
                         }
                         else {
                             if let Ok(val) = str::parse::<i64>(buf) {
-                                toks.push(Token::new(Value::Integer(val), lptr, rptr,
+                                toks.push(Token::new(TokVal::Integer(val), lptr, rptr,
                                                      lno, lcol, col - lcol));
                             }
                             else {
-                                let tok = Token::new(Value::Fault, lptr, rptr,
+                                let tok = Token::new(TokVal::Fault, lptr, rptr,
                                                      lno, lcol, col - lcol);
                                 println!("{}, {}", lcol, col);
                                 errors.push(Error::detailed(100, String::from("Could not parse number as 64-byte signed Integer"),
@@ -139,15 +140,15 @@ pub fn tokenise<'src>(input: &'src str) -> (Vec<(usize, usize)>, Result<Vec<Toke
                     else {
                         match buf {
                             "true" => {
-                                toks.push(Token::new(Value::Boolean(true), lptr, rptr,
+                                toks.push(Token::new(TokVal::Boolean(true), lptr, rptr,
                                                      lno, lcol, col - lcol));
                             },
                             "false" => {
-                                toks.push(Token::new(Value::Boolean(false), lptr, rptr,
+                                toks.push(Token::new(TokVal::Boolean(false), lptr, rptr,
                                                      lno, lcol, col - lcol));
                             },
                             _ => {
-                                toks.push(Token::new(Value::Name(buf), lptr, rptr,
+                                toks.push(Token::new(TokVal::Name(buf), lptr, rptr,
                                                      lno, lcol, col - lcol));
                             }
                         }
@@ -159,11 +160,11 @@ pub fn tokenise<'src>(input: &'src str) -> (Vec<(usize, usize)>, Result<Vec<Toke
                 if !c.is_ascii_digit() {
                     let buf = &input[lptr..=rptr];
                     if let Ok(val) = str::parse::<f64>(buf) {
-                        toks.push(Token::new(Value::Float(val), lptr, rptr,
+                        toks.push(Token::new(TokVal::Float(val), lptr, rptr,
                                              lno, lcol, col - lcol));
                     }
                     else {
-                        let tok = Token::new(Value::Fault, lptr, rptr,
+                        let tok = Token::new(TokVal::Fault, lptr, rptr,
                                              lno, lcol, col - lcol);
 
                         errors.push(Error::detailed(101, String::from("Could not parse number as 64-byte Float"),
@@ -175,7 +176,7 @@ pub fn tokenise<'src>(input: &'src str) -> (Vec<(usize, usize)>, Result<Vec<Toke
             State::SeenBrace => {
                 if c != '%' {
                     assert!(lptr == rptr);
-                    toks.push(Token::new(Value::LBrace, lptr, rptr,
+                    toks.push(Token::new(TokVal::LBrace, lptr, rptr,
                                          lno, lcol, col - lcol));
                     state = State::Neutral; 
                 }
@@ -185,7 +186,7 @@ pub fn tokenise<'src>(input: &'src str) -> (Vec<(usize, usize)>, Result<Vec<Toke
 
         if c == '\n' {
             if let State::SeenPct = state {
-               let tok = Token::new(Value::Fault, lptr, rptr,
+               let tok = Token::new(TokVal::Fault, lptr, rptr,
                                      lno, lcol, col - lcol);
 
                 errors.push(Error::detailed(104, String::from("% was followed by a newline"),
@@ -232,7 +233,7 @@ pub fn tokenise<'src>(input: &'src str) -> (Vec<(usize, usize)>, Result<Vec<Toke
                     state = State::InBare;
                 }
                 else if !c.is_whitespace() {
-                    let tok = Token::new(Value::Fault, lptr, rptr,
+                    let tok = Token::new(TokVal::Fault, lptr, rptr,
                                          lno, lcol, 1);
 
                     errors.push(Error::detailed(102, String::from("Unexpected Character"),
@@ -245,7 +246,7 @@ pub fn tokenise<'src>(input: &'src str) -> (Vec<(usize, usize)>, Result<Vec<Toke
                 if !escaped {
                     if c == '"' {
                         let buf = &input[lptr..rptr];
-                        toks.push(Token::new(Value::String(buf), lptr, rptr,
+                        toks.push(Token::new(TokVal::String(buf), lptr, rptr,
                                              lno, lcol, col - lcol));
                         state = State::Neutral;
                     }
@@ -259,18 +260,18 @@ pub fn tokenise<'src>(input: &'src str) -> (Vec<(usize, usize)>, Result<Vec<Toke
             },
             State::SeenBrace => {
                 assert!(c == '%');
-                toks.push(Token::new(Value::LBracePct, lptr, rptr,
+                toks.push(Token::new(TokVal::LBracePct, lptr, rptr,
                                      lno, lcol, col - lcol));
                 state = State::Neutral;
             },
             State::SeenPct => {
                 if c == '}' {
-                    toks.push(Token::new(Value::RBracePct, lptr, rptr,
+                    toks.push(Token::new(TokVal::RBracePct, lptr, rptr,
                                          lno, lcol, col - lcol));
                     state = State::Neutral;
                 }
                 else {
-                    let tok = Token::new(Value::Fault, lptr, rptr,
+                    let tok = Token::new(TokVal::Fault, lptr, rptr,
                                          lno, lcol, col - lcol);
 
                     errors.push(Error::detailed(103, String::from("% was not followed by }"),

@@ -1,7 +1,9 @@
 use std::result;
+use crate::Lines;
 use crate::tokeniser::Token;
 use crate::util::token_line;
 
+#[derive(Debug)]
 pub struct Error<'src> {
     code: u8,
     msg: String,
@@ -29,7 +31,7 @@ impl<'src> Error<'src> {
         }
     }
 
-    pub fn output(&self, input: &'src str, lines: &Vec<(usize, usize)>) {
+    pub fn output(&self, input: &'src str, lines: &Lines) {
         if let (Some(ref token), Some(ref hint)) = (&self.token, &self.hint) {
             let code_line = format!("{:<3}| {}", token.lno, token_line(input, lines, token));
             let ptr_line = format!("{}{}", " ".repeat(4 + token.col), "^".repeat(token.len));
