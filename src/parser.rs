@@ -506,7 +506,8 @@ fn parse_inner<'ln, 'src>(parser: &mut Parser<'ln, 'src>, strct: &mut Struct) ->
                         TokVal::Plus => { // compound selector
                             parse_compound_entry(parser, strct)?;
                         },
-                        TokVal::Break => { // atomic obj
+                        TokVal::Break | TokVal::RBrace |
+                        TokVal::RBrack | TokVal::RBracePct => { // atomic obj
                             parse_empty_entry(parser, strct)?;
                         },
                         TokVal::Star => {

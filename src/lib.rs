@@ -19,7 +19,6 @@ impl Jacl {
     }
 }
 
-#[derive(Debug)]
 pub struct JaclError<'src> {
     internal: Error<'src>,
     input: &'src str,
