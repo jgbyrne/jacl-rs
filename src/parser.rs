@@ -193,16 +193,6 @@ fn parse_val<'ln, 'src>(parser: &mut Parser<'ln, 'src>) -> Result<Value, Error<'
                 Error::basic(1, String::from("Internal Error: Reached the unreachable!"))
             )}
         },
-        TokVal::At => {
-            parser.step();
-            if let TokVal::Name(name) = parser.expect(
-                |tv| matches!(tv, TokVal::Name(_)), "name")?.val {
-                Ok(Value::Foreign(name.to_string()))
-            }
-            else { Err(
-                Error::basic(1, String::from("Internal Error: Reached the unreachable!"))
-            )}
-        },
         TokVal::String(string) => {
             parser.step();
             Ok(Value::Str(string.to_string()))

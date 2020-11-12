@@ -4,7 +4,6 @@ use indexmap::map::IndexMap;
 pub enum Value {
     Key(String),
     Var(String),
-    Foreign(String),
     Tuple(Vec<Value>),
 
     Str(String),

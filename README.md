@@ -29,13 +29,13 @@ servers {
 
 filters [
     {
-        server = @freenode
+        server = "freenode"
 	user   = "matthew"
 	action = "ignore"
     }
 
     {
-        server = @rizon
+        server = "rizon"
 	user   = "carl"
 	action = "highlight"
     }
@@ -66,13 +66,12 @@ There is just one compound datatype:
 
 * `Tuple` - Sequences of other values like `(4, true, "lapwing")`
 
-There are three reference datatypes:
+There are two reference datatypes:
 
 * `Key` - A reference to an entry within the same structure like `freenode`
 * `Var` - A reference to a property within the same structure like `$default`
-* `Foreign` - An arbitrary reference like `@rizon`
 
-`Key` and `Var` values are resolved automatically at parse-time and cause errors if they cannot be found in the same structure. The parser makes no effort to resolve `Foreign` values which may be used arbitrarily by the program to attempt to access other data. 
+`Key` and `Var` values are resolved automatically at parse-time and cause errors if they cannot be found in the same structure.
 
 ### Structures
 
@@ -105,7 +104,7 @@ examples {
 
     country = {%
         name = "United Kingdom"
-	continent = @europe
+	continent = "Europe"
 	denonym = "Briton"
     %}
 }
@@ -124,7 +123,7 @@ This notation can be considered shorthand for the following:
 ```
 anon {%
     name = "United Kingdom"
-    continent = @europe
+    continent = "Europe"
     denonym = "Briton"
 %}
 
