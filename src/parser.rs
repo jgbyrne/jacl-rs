@@ -1,4 +1,4 @@
-use std::collections::HashMap;
+use indexmap::map::IndexMap;
 
 use crate::Lines;
 use crate::tokeniser::{Token, TokVal};
@@ -19,11 +19,65 @@ pub enum Value {
     Bool(bool),
 }
 
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 pub enum Struct {
     Object { entries: Entries, props: Props},
     Table { entries: Entries },
     Map { props: Props },
+}
+
+impl Struct {
+    fn entries_extend<'src>(parser: &mut Parser<'src>,
+                            ex_entries: &mut Entries,
+                            new_entries: &Entries) -> Result<(), Error<'src>> {
+        for (new_key, new_entry) in new_entries.iter() {
+            if let Some(Some(ex_entry)) = ex_entries.get_mut(new_key) {
+                if let Some(new_entry) = new_entry {
+                    ex_entry.extend(parser, new_key, new_entry.clone())?;
+                }
+                else {
+                    return Err(Error::detailed(162, format!("Entry {} redefined with no new data", new_key),
+                               parser.cur_expect()?.clone(), String::from("Remove this redefinition")));
+                }
+            }
+            else {
+                ex_entries.insert(new_key.clone(), new_entry.clone());
+            }
+        }
+        Ok(())
+    }
+
+    fn extend<'src>(&mut self,
+                    parser: &mut Parser<'src>,
+                    name: &str, new: Struct) -> Result<(), Error<'src>>{
+        match self {
+            Struct::Object { entries: ex_entries,
+                                  props: ex_props } => {
+                if let Struct::Object { entries: new_entries,
+                                        props: new_props } = new {
+                    ex_props.extend(new_props);
+                    Struct::entries_extend(parser, ex_entries, &new_entries)
+                }
+                else {
+                     Err(Error::detailed(161, format!("Entry {} already defined as Object", name),
+                         parser.cur_expect()?.clone(), String::from("Make this entry an Object")))
+                }
+            },
+            Struct::Table { entries: ex_entries } => {
+                if let Struct::Table { entries: new_entries } = new {
+                    Struct::entries_extend(parser, ex_entries, &new_entries)
+                }
+                else {
+                    Err(Error::detailed(160, format!("Entry {} already defined as Table", name),
+                        parser.cur_expect()?.clone(), String::from("Make this entry a Table")))
+                }
+           },
+           Struct::Map {..} => {
+               Err(Error::detailed(159, format!("Entry {} already defined as Map", name),
+                   parser.cur_expect()?.clone(), String::from("Make this entry a Map")))
+           }
+        }
+    }
 }
 
 enum RValue {
@@ -31,8 +85,8 @@ enum RValue {
     Struct(Struct),
 }
 
-type Entries = HashMap<String, Option<Struct>>;
-type Props = HashMap<String, Value>;
+type Entries = IndexMap<String, Option<Struct>>;
+type Props = IndexMap<String, Value>;
 
 struct Parser<'src> {
     input: &'src str,
@@ -62,7 +116,6 @@ impl<'src> Parser<'src> {
                 Ok(tok.clone())
             },
             None => {
-                panic!();
                 Err(Error::basic(154, String::from("Unexpected End-of-file")))
             },
         }
@@ -277,8 +330,21 @@ fn parse_single_entry<'src>(parser: &mut Parser<'src>, strct: &mut Struct) -> Re
             if let TokVal::Name(name) = parser.cur_expect()?.val {
                 parser.step();
                 let strct = parse_struct(parser)?;
-                entries.insert(name.to_string(), Some(strct));
-                Ok(())
+                if let Some(extant) = entries.get_mut(name) {
+                    match extant {
+                        Some(extant) => {
+                            extant.extend(parser, name, strct)
+                        },
+                        None => {
+                            entries.insert(name.to_string(), Some(strct));
+                            Ok(())
+                        }
+                    }
+                }
+                else {
+                    entries.insert(name.to_string(), Some(strct));
+                    Ok(())
+                }
             }
             else {
                 Err(Error::basic(1, String::from("Internal Parser Error: TokVal was not Name")))
@@ -307,10 +373,19 @@ fn parse_empty_entry<'src>(parser: &mut Parser<'src>, strct: &mut Struct) -> Res
     match strct {
         Struct::Object { entries, props: _ } |
         Struct::Table { entries } => {
-            if let TokVal::Name(name) = parser.cur_expect()?.val {
+            let tok = parser.cur_expect()?;
+            if let TokVal::Name(name) = tok.val {
                 parser.step();
-                entries.insert(name.to_string(), None);
-                Ok(())
+                match entries.get(name) {
+                    Some(_) => {
+                        Err(Error::detailed(162, format!("Entry {} redefined with no new data", name),
+                            tok.clone(), String::from("Remove this redefinition")))
+                    },
+                    None => {
+                        entries.insert(name.to_string(), None);
+                        Ok(())
+                    }
+                }
             }
             else {
                 Err(Error::basic(1, String::from("Internal Parser Error: TokVal was not Name")))
@@ -391,8 +466,8 @@ fn parse_inner<'src>(parser: &mut Parser<'src>, strct: &mut Struct) -> Result<()
 fn parse_obj_struct<'src>(parser: &mut Parser<'src>) -> Result<Struct, Error<'src>> {
     parser.expect(|tv| matches!(tv, TokVal::LBrace), "'{'");
     let mut obj = Struct::Object {
-        entries: HashMap::new(),
-        props: HashMap::new(),
+        entries: IndexMap::new(),
+        props: IndexMap::new(),
     };
     parse_inner(parser, &mut obj)?;
     parser.expect(|tv| matches!(tv, TokVal::RBrace), "'}'");
@@ -402,7 +477,7 @@ fn parse_obj_struct<'src>(parser: &mut Parser<'src>) -> Result<Struct, Error<'sr
 fn parse_tbl_struct<'src>(parser: &mut Parser<'src>) -> Result<Struct, Error<'src>> {
     parser.expect(|tv| matches!(tv, TokVal::LBrack), "'['");
     let mut tbl = Struct::Table {
-        entries: HashMap::new(),
+        entries: IndexMap::new(),
     };
     parse_inner(parser, &mut tbl)?;
     parser.expect(|tv| matches!(tv, TokVal::RBrack), "']'");
@@ -412,7 +487,7 @@ fn parse_tbl_struct<'src>(parser: &mut Parser<'src>) -> Result<Struct, Error<'sr
 fn parse_map_struct<'src>(parser: &mut Parser<'src>) -> Result<Struct, Error<'src>> {
     parser.expect(|tv| matches!(tv, TokVal::LBracePct), "'{%'");
     let mut map = Struct::Map {
-        props: HashMap::new(),
+        props: IndexMap::new(),
     };
     parse_inner(parser, &mut map)?;
     parser.expect(|tv| matches!(tv, TokVal::RBracePct), "'%}'");
@@ -443,8 +518,8 @@ pub fn parse<'src>(input: &'src str,
                    tokens: Vec<Token<'src>>) -> Result<Struct, Error<'src>> {
     let mut parser = Parser::new(input, lines, tokens);
     let mut root = Struct::Object {
-        entries: HashMap::new(),
-        props: HashMap::new(),
+        entries: IndexMap::new(),
+        props: IndexMap::new(),
     };
     parse_inner(&mut parser, &mut root)?;
     Ok(root)

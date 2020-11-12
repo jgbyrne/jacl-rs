@@ -194,7 +194,8 @@ pub fn tokenise<'src>(input: &'src str) -> (Lines, Result<Vec<Token<'src>>, Vec<
 
                 state = State::Unrecoverable;
             }
-
+            toks.push(Token::new(TokVal::Break, rptr, offset,
+                                 lno, col, 1));
             lines.push((lineptr, rptr));
             lno += 1;
             col = 1;
