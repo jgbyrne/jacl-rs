@@ -5,6 +5,8 @@ use crate::error::Error;
 use crate::types::{Entries, Props, Struct};
 pub use crate::types::Value;
 
+
+#[derive(Debug)]
 pub struct JaclError<'src> {
     internal: Error<'src>,
     input: &'src str,
@@ -61,6 +63,7 @@ fn transform_entries<'s, 'jacl: 's>(entries: &'s Entries, jacl: &'jacl Jacl) -> 
         }).collect::<Vec<(Option<&String>, Option<JaclStruct>)>>()
 }
 
+#[derive(Debug)]
 pub struct Object<'s> {
     jacl: &'s Jacl,
     entries: &'s Entries,
@@ -97,6 +100,7 @@ impl<'s> Object<'s> {
     }
 }
 
+#[derive(Debug)]
 pub struct Table<'s> {
     jacl: &'s Jacl,
     entries: &'s Entries,
@@ -124,6 +128,7 @@ impl<'s> Table<'s> {
     }
 }
 
+#[derive(Debug)]
 pub struct Map<'s> {
     jacl: &'s Jacl,
     props: &'s Props,
@@ -139,13 +144,14 @@ impl<'s> Map<'s> {
     }
 }
 
+#[derive(Debug)]
 pub enum JaclStruct<'s> {
     Object(Object<'s>),
     Table(Table<'s>),
     Map(Map<'s>),
 }
 
-
+#[derive(Debug)]
 pub struct Jacl {
     inr: Struct 
 }
