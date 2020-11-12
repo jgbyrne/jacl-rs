@@ -177,7 +177,7 @@ impl<'ln, 'src> Parser<'ln, 'src> {
 
 /* Parse Bindings */
 
-fn parse_val<'ln, 'src>(parser: &mut Parser<'ln, 'src>) -> Result<Value, Error<'src>> {
+fn parse_val<'ln, 'src>(parser: &mut Parser<'ln, 'src>, strct: &mut Struct) -> Result<Value, Error<'src>> {
     match parser.cur_expect()?.val {
         TokVal::Name(name) => {
             parser.step();
@@ -185,9 +185,25 @@ fn parse_val<'ln, 'src>(parser: &mut Parser<'ln, 'src>) -> Result<Value, Error<'
         }
         TokVal::Dollar => {
             parser.step();
-            if let TokVal::Name(name) = parser.expect(
-                |tv| matches!(tv, TokVal::Name(_)), "name")?.val {
-                Ok(Value::Var(name.to_string()))
+
+            let tok = parser.expect(|tv| matches!(tv, TokVal::Name(..)), "name")?;
+            if let TokVal::Name(name) = tok.val {
+                match strct {
+                    Struct::Object { entries: _, props } |
+                    Struct::Map { props } => {
+                        match props.get(name) {
+                            Some(val) => Ok(val.clone()),
+                            None => Err(
+                                Error::detailed(165, String::from("No such var"),
+                                        tok.clone(), String::from("At this point no property exists with this name"))
+                                                
+                            ),
+                        }
+                    },
+                    Struct::Table { .. } => {
+                        Err(Error::basic(1, String::from("Internal Error: tried to parse val within a Table")))
+                    },
+                }
             }
             else { Err(
                 Error::basic(1, String::from("Internal Error: Reached the unreachable!"))
@@ -213,7 +229,7 @@ fn parse_val<'ln, 'src>(parser: &mut Parser<'ln, 'src>) -> Result<Value, Error<'
             parser.step();
             let mut tuple: Vec<Value> = Vec::new();
             loop {
-                tuple.push(parse_val(parser)?);
+                tuple.push(parse_val(parser, strct)?);
                 let tok = parser.cur_expect()?;
                 match tok.val {
                     TokVal::RParen => {
@@ -246,13 +262,13 @@ fn parse_val<'ln, 'src>(parser: &mut Parser<'ln, 'src>) -> Result<Value, Error<'
     }
 }
 
-fn parse_rval<'ln, 'src>(parser: &mut Parser<'ln, 'src>) -> Result<RValue, Error<'src>> {
+fn parse_rval<'ln, 'src>(parser: &mut Parser<'ln, 'src>, strct: &mut Struct) -> Result<RValue, Error<'src>> {
     match parser.cur_expect()?.val {
         TokVal::LBrace | TokVal::LBrack | TokVal::LBracePct => {
             Ok(RValue::Struct(parse_struct(parser)?))
         }
         _ => {
-            Ok(RValue::Value(parse_val(parser)?))
+            Ok(RValue::Value(parse_val(parser, strct)?))
         }
     }
 }
@@ -260,7 +276,7 @@ fn parse_rval<'ln, 'src>(parser: &mut Parser<'ln, 'src>) -> Result<RValue, Error
 fn parse_rhs<'ln, 'src>(parser: &mut Parser<'ln, 'src>, strct: &mut Struct, names: Vec<String>) -> Result<(), Error<'src>> {
     let eq = parser.expect(|tv| matches!(tv, TokVal::Equals), "'='")?;
     let rval_start = parser.cur_expect()?;
-    match parse_rval(parser)? {
+    match parse_rval(parser, strct)? {
         RValue::Value(val) => {
             match strct {
                 Struct::Object { entries: _ , props } |
