@@ -210,11 +210,11 @@ fn parse_val<'ln, 'src>(parser: &mut Parser<'ln, 'src>, strct: &mut Struct) -> R
         },
         TokVal::String(string) => {
             parser.step();
-            Ok(Value::Str(string.to_string()))
+            Ok(Value::String(string.to_string()))
         },
         TokVal::Integer(integer) => {
             parser.step();
-            Ok(Value::Int(integer))
+            Ok(Value::Integer(integer))
         },
         TokVal::Float(float) => {
             parser.step();
@@ -222,7 +222,7 @@ fn parse_val<'ln, 'src>(parser: &mut Parser<'ln, 'src>, strct: &mut Struct) -> R
         },
         TokVal::Boolean(boolean) => {
             parser.step();
-            Ok(Value::Bool(boolean))
+            Ok(Value::Boolean(boolean))
         }
         TokVal::LParen => {
             parser.step();

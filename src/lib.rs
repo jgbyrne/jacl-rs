@@ -3,47 +3,18 @@ mod tokeniser;
 mod parser;
 mod error;
 mod types;
+mod api;
 
 pub use error::{Error};
+pub use crate::api::*;
 
 type Lines = Vec<(usize, usize)>;
-
-#[derive(Debug)]
-pub struct Jacl {
-    root: types::Struct,
-}
-
-impl Jacl {
-    pub fn root(&self) -> &types::Struct {
-        &self.root
-    }
-}
-
-pub struct JaclError<'src> {
-    internal: Error<'src>,
-    input: &'src str,
-    lines: Lines,
-}
-
-impl<'src> JaclError<'src> {
-    fn from_error(err: Error<'src>, input: &'src str, lines: Lines) -> JaclError<'src> {
-        JaclError {
-            internal: err,
-            input,
-            lines,
-        }
-    }
-
-    pub fn render(&self) -> String {
-        self.internal.render(self.input, &self.lines)
-    }
-}
 
 pub fn read_string<'src>(input: &'src str) -> Result<Jacl, JaclError> {
     match tokeniser::tokenise(&input) {
         (lines, Ok(toks)) => {
             match parser::parse(&input, &lines, toks) {
-                Ok(data) => Ok(Jacl { root: data }),
+                Ok(data) => Ok(Jacl::init(data)),
                 Err(err) => Err(JaclError::from_error(err, &input, lines)),
             }
         },

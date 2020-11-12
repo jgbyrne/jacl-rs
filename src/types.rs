@@ -3,13 +3,12 @@ use indexmap::map::IndexMap;
 #[derive(Clone, Debug)]
 pub enum Value {
     Key(String),
-    Var(String),
     Tuple(Vec<Value>),
 
-    Str(String),
-    Int(i64),
+    String(String),
+    Integer(i64),
     Float(f64),
-    Bool(bool),
+    Boolean(bool),
 }
 
 pub type Entries = IndexMap<String, Option<Struct>>;
