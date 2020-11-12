@@ -406,7 +406,7 @@ fn parse_compound_entry<'ln, 'src>(parser: &mut Parser<'ln, 'src>, strct: &mut S
                 if let Some(extant) = entries.get_mut(name) {
                     match extant {
                         Some(extant) => {
-                            extant.extend(parser, name, strct.clone());
+                            extant.extend(parser, name, strct.clone())?;
                         },
                         None => {
                             entries.insert(name.to_string(), Some(strct.clone()));
@@ -529,33 +529,33 @@ fn parse_inner<'ln, 'src>(parser: &mut Parser<'ln, 'src>, strct: &mut Struct) ->
 
 
 fn parse_obj_struct<'ln, 'src>(parser: &mut Parser<'ln, 'src>) -> Result<Struct, Error<'src>> {
-    parser.expect(|tv| matches!(tv, TokVal::LBrace), "'{'");
+    parser.expect(|tv| matches!(tv, TokVal::LBrace), "'{'")?;
     let mut obj = Struct::Object {
         entries: IndexMap::new(),
         props: IndexMap::new(),
     };
     parse_inner(parser, &mut obj)?;
-    parser.expect(|tv| matches!(tv, TokVal::RBrace), "'}'");
+    parser.expect(|tv| matches!(tv, TokVal::RBrace), "'}'")?;
     Ok(obj)
 }
 
 fn parse_tbl_struct<'ln, 'src>(parser: &mut Parser<'ln, 'src>) -> Result<Struct, Error<'src>> {
-    parser.expect(|tv| matches!(tv, TokVal::LBrack), "'['");
+    parser.expect(|tv| matches!(tv, TokVal::LBrack), "'['")?;
     let mut tbl = Struct::Table {
         entries: IndexMap::new(),
     };
     parse_inner(parser, &mut tbl)?;
-    parser.expect(|tv| matches!(tv, TokVal::RBrack), "']'");
+    parser.expect(|tv| matches!(tv, TokVal::RBrack), "']'")?;
     Ok(tbl)
 }
 
 fn parse_map_struct<'ln, 'src>(parser: &mut Parser<'ln, 'src>) -> Result<Struct, Error<'src>> {
-    parser.expect(|tv| matches!(tv, TokVal::LBracePct), "'{%'");
+    parser.expect(|tv| matches!(tv, TokVal::LBracePct), "'{%'")?;
     let mut map = Struct::Map {
         props: IndexMap::new(),
     };
     parse_inner(parser, &mut map)?;
-    parser.expect(|tv| matches!(tv, TokVal::RBracePct), "'%}'");
+    parser.expect(|tv| matches!(tv, TokVal::RBracePct), "'%}'")?;
     Ok(map)
 }
 

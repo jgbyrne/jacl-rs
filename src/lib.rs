@@ -9,11 +9,7 @@ pub use error::{Error};
 type Lines = Vec<(usize, usize)>;
 
 pub struct Jacl {
-    root: types::Struct,
-}
-
-impl Jacl {
-
+    strct: types::Struct,
 }
 
 pub struct JaclError<'src> {
@@ -36,7 +32,7 @@ pub fn read_string<'src>(input: &'src str) -> Result<Jacl, JaclError> {
     match tokeniser::tokenise(&input) {
         (lines, Ok(toks)) => {
             match parser::parse(&input, &lines, toks) {
-                Ok(data) => Ok(Jacl { root: data }),
+                Ok(data) => Ok(Jacl { strct: data }),
                 Err(err) => Err(JaclError::from_error(err, &input, lines)),
             }
         },
