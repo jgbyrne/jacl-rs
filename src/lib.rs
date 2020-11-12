@@ -8,6 +8,7 @@ pub use error::{Error};
 
 type Lines = Vec<(usize, usize)>;
 
+#[derive(Debug)]
 pub struct Jacl {
     root: types::Struct,
 }
@@ -18,6 +19,7 @@ impl Jacl {
     }
 }
 
+#[derive(Debug)]
 pub struct JaclError<'src> {
     internal: Error<'src>,
     input: &'src str,
