@@ -196,7 +196,7 @@ pub fn tokenise<'src>(input: &'src str) -> (Lines, Result<Vec<Token<'src>>, Vec<
             }
             else if !matches!(state, State::Neutral) {
                 let tok = Token::new(TokVal::Fault, lptr, rptr,
-                                     lno, lcol, col - lcol);
+                                     lno, col, 1);
 
                 errors.push(Error::detailed(105, String::from("Unexpected newline"),
                                             tok, String::from("Remove this linebreak")));
